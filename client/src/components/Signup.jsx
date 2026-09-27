@@ -10,7 +10,7 @@ function Signup() {
         setMessage("");
 
         if (!username.trim() || !password) {
-            setMessage("Username and password are required");
+            setMessage("Username and password are required.");
             return;
         }
 
@@ -22,14 +22,20 @@ function Signup() {
                 },
                 body: JSON.stringify({
                     username: username.trim(),
-                    password: password
+                    password
                 })
             });
 
             const data = await response.json();
             setMessage(data.message);
+
+            if (response.ok) {
+                setUsername("");
+                setPassword("");
+            }
         } catch (error) {
-            setMessage("Could not connect to the server");
+            console.error("Signup request failed:", error);
+            setMessage("Could not connect to the server.");
         }
     }
 
@@ -44,6 +50,7 @@ function Signup() {
                     type="text"
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
+                    autoComplete="username"
                     required
                 />
             </div>
@@ -55,6 +62,7 @@ function Signup() {
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
+                    autoComplete="new-password"
                     required
                 />
             </div>

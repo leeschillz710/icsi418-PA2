@@ -16,19 +16,16 @@ const client = new MongoClient(process.env.MONGO_URI);
 
 let users;
 
-// Signup route
 app.post("/signup", async (req, res) => {
     const { username, password } = req.body;
 
-    // Check required fields
-    if (!username || !password) {
+    if (!username?.trim() || !password) {
         return res.status(400).json({
             message: "Username and password are required."
         });
     }
 
     try {
-        // Check whether the username is already taken
         const existingUser = await users.findOne({
             username: username.trim()
         });
@@ -39,10 +36,8 @@ app.post("/signup", async (req, res) => {
             });
         }
 
-        // Hash the password before storing it
         const passwordHash = await bcrypt.hash(password, 10);
 
-        // Create the user
         await users.insertOne({
             username: username.trim(),
             password: passwordHash
@@ -60,7 +55,49 @@ app.post("/signup", async (req, res) => {
     }
 });
 
-// Connect to MongoDB before starting Express
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
+
+    if (!username?.trim() || !password) {
+        return res.status(400).json({
+            message: "Username and password are required."
+        });
+    }
+
+    try {
+        const user = await users.findOne({
+            username: username.trim()
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                message: "Invalid username or password."
+            });
+        }
+
+        const passwordMatches = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        if (!passwordMatches) {
+            return res.status(401).json({
+                message: "Invalid username or password."
+            });
+        }
+
+        return res.status(200).json({
+            message: "Login successful."
+        });
+    } catch (error) {
+        console.error("Login error:", error);
+
+        return res.status(500).json({
+            message: "Server error."
+        });
+    }
+});
+
 async function startServer() {
     try {
         await client.connect();
