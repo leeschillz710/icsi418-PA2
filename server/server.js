@@ -9,25 +9,40 @@ dotenv.config();
 const app = express();
 const PORT = 9000;
 
-app.use(cors());
-app.use(express.json());
+app.use(cors());            // allow frontend to communicate with backend
+app.use(express.json());    // parse JSON request bodies
 
+// connect MongoDB using URI from .env
 const client = new MongoClient(process.env.MONGO_URI);
 
-let users;
+let users;  // will hold the MongoDb "users" collection
 
+// ---------- SIGNUP ROUTE --------------
 app.post("/signup", async (req, res) => {
-    const { username, password } = req.body;
-
-    if (!username?.trim() || !password) {
+    const {
+        f_name,
+        l_name,
+        username,
+        password
+    } = req.body;
+    // validate required fields
+    if (
+        !f_name?.trim() ||
+        !l_name?.trim() ||
+        !username?.trim() ||
+        !password
+    ) {
         return res.status(400).json({
-            message: "Username and password are required."
+            message: "All fields are required."
         });
     }
 
     try {
+        const cleanUsername = username.trim();
+
+        // check if username already exists
         const existingUser = await users.findOne({
-            username: username.trim()
+            username: cleanUsername
         });
 
         if (existingUser) {
@@ -36,10 +51,14 @@ app.post("/signup", async (req, res) => {
             });
         }
 
+        // hash password before storing
         const passwordHash = await bcrypt.hash(password, 10);
 
+        // insert new user into the database
         await users.insertOne({
-            username: username.trim(),
+            f_name: f_name.trim(),
+            l_name: l_name.trim(),
+            username: cleanUsername,
             password: passwordHash
         });
 
@@ -49,15 +68,24 @@ app.post("/signup", async (req, res) => {
     } catch (error) {
         console.error("Signup error:", error);
 
+        // handle duplicate username error from MongoDB
+        if (error.code === 11000) {
+            return res.status(409).json({
+                message: "Username already exists."
+            });
+        }
+
         return res.status(500).json({
             message: "Server error."
         });
     }
 });
 
+// ---------- LOGIN ROUTE --------------
 app.post("/login", async (req, res) => {
     const { username, password } = req.body;
 
+    // validate required fields
     if (!username?.trim() || !password) {
         return res.status(400).json({
             message: "Username and password are required."
@@ -65,6 +93,7 @@ app.post("/login", async (req, res) => {
     }
 
     try {
+        // look up user by username
         const user = await users.findOne({
             username: username.trim()
         });
@@ -75,6 +104,7 @@ app.post("/login", async (req, res) => {
             });
         }
 
+        // compare provided password with stored hash
         const passwordMatches = await bcrypt.compare(
             password,
             user.password
@@ -98,17 +128,26 @@ app.post("/login", async (req, res) => {
     }
 });
 
+// ---------- SERVER STARTUP ---------
 async function startServer() {
     try {
-        await client.connect();
+        await client.connect(); // connect to MongoDB
 
         const db = client.db("pa2");
         users = db.collection("users");
 
+        // ensure usernames are unique
+        await users.createIndex(
+            { username: 1 },
+            { unique: true }
+        );
+
         console.log("Connected to MongoDB");
 
         app.listen(PORT, () => {
-            console.log(`Server running at http://localhost:${PORT}`);
+            console.log(
+                `Server running at http://localhost:${PORT}`
+            );
         });
     } catch (error) {
         console.error("MongoDB connection failed:", error);
